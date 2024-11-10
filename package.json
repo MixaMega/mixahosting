@@ -1,0 +1,21 @@
+{
+  "dependencies": {
+    "@types/fs-extra": "^9.0.13",
+    "axios": "^0.27.2",
+    "better-sqlite3": "^8.1.0",
+    "body-parser": "^1.20.2",
+    "decompress": "^4.2.1",
+    "discord.js": "^14.3.0",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "fs-extra": "^10.1.0",
+    "node-hill": "^13.1.0",
+    "pm2": "^5.3.0",
+    "quick.db": "^9.0.8",
+    "read-last-lines": "^1.8.0"
+  },
+  "scripts": {
+    "start": "node src/bot.js",
+    "deploy": "node src/deploy-commands.js"
+  }
+}

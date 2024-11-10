@@ -1,0 +1,33 @@
+const Docker = require('dockerode');
+const docker = new Docker()
+const { spawn } = require('node:child_process');
+const { QuickDB } = require("quick.db");
+const db = new QuickDB({ filePath: './data.sqlite' });
+const fsp = require("node:fs/promises")
+const fs = require("node:fs")
+module.exports = {
+    data: {
+        customId: "softsSOFTSDUISJBI&#@(*tart",
+        async execute(interaction) {
+
+            await interaction.deferReply({ ephemeral: false })
+            game = interaction.customId.split("|")[1]
+
+            const containerList = await docker.listContainers({ 'all': true })
+            let info = containerList.find(cont => cont.Image.startsWith(`${interaction.user.id + game}`))
+            if(!info){
+                await interaction.editReply("No container found, please start your game normally to generate the container")
+                return
+            }
+            let container = docker.getContainer(info.Id)
+            if ( info.State === 'exited' ) {
+                container.start()
+                await interaction.editReply("Started your game")
+            }else{
+                //console.log(await container.inspect())
+                await interaction.editReply({ content: "Your game is already started!", ephemeral: false })
+            }
+
+        }
+    }
+}

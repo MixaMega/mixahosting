@@ -1,0 +1,43 @@
+const Docker = require('dockerode');
+const { spawn } = require('node:child_process');
+const { QuickDB } = require("quick.db");
+const db = new QuickDB({ filePath: './data.sqlite' });
+const fsp = require("node:fs/promises")
+module.exports = {
+    data: {
+        customId: "STOPDOCEKRE&*(^#$*&#$@^)$#",
+        async execute(interaction) {
+            await interaction.deferReply({ ephemeral: false })
+            game = interaction.customId.split("|")[1]
+
+            let docker = new Docker()
+
+            let containers = await docker.listContainers({ 'all': true })
+            let container = containers.find(cont => cont.Image === `${interaction.user.id + game}`)
+
+            if (container.State === 'running') {
+
+                container.stop()
+                await interaction.editReply("Stopped your game!")
+
+            } else {
+
+                await interaction.editReply("Your game is not started!")
+
+            }
+
+
+
+            /*let stuff = []
+            let stopper = spawn('docker', ['image', 'ls'])
+
+            stopper.stdout.on('data', (data) => {
+                stuff.push(data.toString())
+            });
+            stopper.on('exit',()=>{
+                console.log(stuff.join('|').replace(/ +/g, '|'))
+            })*/
+
+        }
+    }
+}

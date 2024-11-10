@@ -1,0 +1,120 @@
+const Docker = require('dockerode');
+const docker = new Docker()
+const { spawn } = require('node:child_process');
+const { QuickDB } = require("quick.db");
+const db = new QuickDB({ filePath: './data.sqlite' });
+const fsp = require("node:fs/promises")
+const fs = require("node:fs")
+module.exports = {
+    data: {
+        customId: "STARTDOCKER#@!#*&%!@(#*&!",
+        async execute(interaction) {
+
+            await interaction.deferReply({ ephemeral: false })
+            game = interaction.customId.split("|")[1]
+
+            const containerList = await docker.listContainers({ 'all': true })
+            let container = containerList.find(cont => cont.Image.startsWith(`${interaction.user.id + game}`))
+            if (container) {
+                if (container.State === 'running') {
+                    await interaction.editReply({ content: "Your game is already started!", ephemeral: false })
+                    return
+                } else {
+                    await interaction.editReply({ content: "Removing container <a:loading:1018246479325954149>", ephemeral: false })
+                    await docker.getContainer(container.Id).remove()
+                }
+            }
+            try {
+                await docker.getImage(`${interaction.user.id + game}`).remove()
+                await interaction.editReply({ content: "Removed the old docker image\nCreating a new docker image <a:loading:1018246479325954149>", ephemeral: false })
+            } catch (error) {
+                await interaction.editReply({ content: "No old docker image found; Skipping\nCreating a new docker image <a:loading:1018246479325954149>", ephemeral: false })
+            }
+
+            let startjs = {
+                hostKey: await db.get(`${interaction.user.id}.${game}.hostkey`),
+                port: sum(interaction.user.id),
+                local: false,
+                cli: false,
+                map: await db.get(`${interaction.user.id}.${game}.map`),
+                mapDirectory: './maps',
+                scripts: './scripts',
+                modules: [
+                    "axios"
+                ]
+            }
+
+            if (!startjs.hostKey) {
+                await interaction.editReply({ content: "Please add a host key", ephemeral: false })
+                return
+            }
+            if (!startjs.map) {
+                await interaction.editReply({ content: "Please set the main map", ephemeral: false })
+                return
+            }
+
+            await fsp.writeFile(`./data/${interaction.user.id}/${game}/start.js`, `const nh = require('node-hill')\n\nnh.startServer(${JSON.stringify(startjs)})`)
+            await fsp.writeFile(`./data/${interaction.user.id}/${game}/Dockerfile`, `FROM node:12\n\nWORKDIR /game\n\nCOPY . ./\n\nRUN npm install\n\nEXPOSE ${startjs.port}\n\nCMD ["npm" , "start"]`)
+
+            //await docker.buildImage(fs.createReadStream(`./data/${interaction.user.id}/${game}/Dockerfile`), { t: interaction.user.id + "" })
+
+            const build = spawn(`docker`, ['build', `.\\data\\${interaction.user.id}\\${game}`, `-t`, `${interaction.user.id + game}`])
+            build.on('exit', async (code, signal) => {
+                if (code !== 0) {
+
+                    await interaction.editReply({ content: "Sorry something went wrong while creating the docker image", ephemeral: false })
+                    return
+
+                } else {
+
+                    await interaction.editReply({ content: "Created the new docker image\nStarting the game <a:loading:1018246479325954149>", ephemeral: false })
+
+                    const start = spawn('docker', ['run', '-p', `${startjs.port}:${startjs.port}`, `${interaction.user.id + game}`])
+                    const logStream = fs.createWriteStream(`./data/${interaction.user.id}/${game}/log.txt`, { flags: 'a', force: true });
+
+                    let logfunc = async data => {
+                        if (data.startsWith("Posted to: https://www.brick-hill.com/play/")) {
+                            logfunc = () => { }
+                            await interaction.editReply({ content: "The game is up \n" + data.split(' ')[2], ephemeral: false })
+                        }
+                    }
+
+                    /*function exitnotify(chunk) {
+                        let stuff = JSON.parse(chunk.toString('utf8'))
+                        if (stuff.from === `${interaction.user.id + game}` && stuff.status === 'die') {
+                            interaction.followUp({ content: `Exited with code ${stuff.Actor.Attributes.exitCode}`, ephemeral: false })
+                            data.off('data', exitnotify(chunk))
+                        }
+                    }
+                    docker.getEvents({}, function (err, data) {
+                        if (err) {
+                            console.log(err.message);
+                        } else {
+                            data.on('data', exitnotify(chunk));
+                        }
+                    });*/
+
+                    start.stdout.pipe(logStream)
+                    start.stderr.pipe(logStream)
+                    start.stdout.on('data', data => logfunc(data.toString()))
+
+                    await interaction.editReply({ content: "Waiting for postServer <a:loading:1018246479325954149>\n(The game is probably started)", ephemeral: false })
+
+                }
+            })
+
+
+            function sum(string) {
+                let array = string.split('')
+                let value = 0
+                array.forEach(number => {
+                    number = parseInt(number)
+                    value += number
+                });
+                return value * 3
+            }
+
+
+        }
+    }
+}
